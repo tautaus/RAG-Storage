@@ -1,0 +1,51 @@
+corpus_name: "fiqa"     # or "msmarco-passage" (subset in prepare_data.py)
+corpus_sizes: [10000, 30000, 60000]
+query_count: 50
+recall_k: 50
+
+llm_ingest:
+  enabled: true            # false = current behavior (no LLM chunking)
+  provider: local          # or openai
+  model: gpt2              # or "gpt-4o-mini", "gpt-3.5-turbo", etc.
+  max_ctx_tokens: 2048     # LLM input budget
+  target_chunk_tokens: 200 # soft chunk size
+  overlap_tokens: 40
+  add_summary: true
+  cache_dir: data/cache/llm
+
+embedding:
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  batch_size: 64
+  normalize: true
+  distance: "cosine"
+  doc_limit: 10000
+
+index:
+  batch_size: 1000      # controls SQLite/Chroma add() chunk size
+
+ann:
+  engine: "chroma"
+  hnsw:
+    M: 16
+    ef_construction: 128
+    ef_search: 128
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  results_dir: "results"
+
+retrieval:
+  query_expander: "llm"
+  n_query_expansions: 3
+  chroma_per_query: 20
+  sqlite_limit: 1000
+
+llm:
+  # Local generator also used for LLM-based query expansion
+  provider: "gpt2-local"
+  model: "gpt2"
+  enable_generation: false
+  max_context_chars: 2800
+  max_new_tokens: 200
+  temperature: 0.5

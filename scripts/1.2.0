@@ -1,0 +1,3 @@
+Looking in indexes: https://download.pytorch.org/whl/cpu
+Requirement already satisfied: sentence-transformers in c:\users\sunt9\anaconda3\envs\rag-storage\lib\site-packages (5.1.2)
+Requirement already satisfied: radon in c:\users\sunt9\anaconda3\envs\rag-storage\lib\site-packages (6.0.1)

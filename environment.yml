@@ -1,0 +1,49 @@
+name: rag-storage
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - sqlite
+  - numpy
+  - pandas
+  - scikit-learn
+  - tqdm
+  - jupyterlab
+  - requests
+  - pip:
+      # Embeddings
+      - sentence-transformers>=2.2.2
+      
+      # Vector search / ANN
+      - hnswlib>=0.8.0
+      - chromadb>=0.5.0
+      - faiss-cpu>=1.7.4   # safe on Windows (not faiss-gpu)
+
+      # RAG benchmarking & dataset
+      - beir>=1.0.0        # BEIR dataset loader
+      - datasets           # fallback dataset source
+      - huggingface-hub
+
+      # Plotting/analysis
+      - matplotlib
+      - seaborn
+
+      # Code quality (maintainability measurement)
+      - radon             # static analysis: cyclomatic complexity
+      - ruff              # linting
+
+      # Optional utilities
+      - rich              # pretty logging output
+      - orjson            # faster JSON
+      - psutil
+      - tqdm
+
+      # Static analysis (modularity/maintainability)
+      - radon               # cyclomatic complexity / maintainability index
+      - import-linter       # optional, import graph coupling
+
+      # LLM runtimes (choose one: openai OR local llama)
+      - transformers
+      - torch --index-url https://download.pytorch.org/whl/cpu  # CPU build; replace if GPU available
