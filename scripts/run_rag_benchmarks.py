@@ -259,6 +259,7 @@ def main(cfg_path: str, backend_name: str):
     sum_retr_ms = 0.0
     sum_gen_ms  = 0.0
     sum_recall  = 0.0
+    sum_tokens  = 0.0
 
     for qobj in queries:
         qid = qobj["id"]
@@ -314,10 +315,11 @@ def main(cfg_path: str, backend_name: str):
             sum_retr_ms += retr_ms
             sum_gen_ms  += gen_ms
             sum_recall  += r_at_k
+            sum_tokens += c_tokens
 
     be.close()
-
-        # --- Build and persist a compact run summary with tail latency & resources ---
+    
+    # --- Build and persist a compact run summary with tail latency & resources ---
     def dir_size_mb(path):
         if not os.path.exists(path): return 0.0
         if os.path.isfile(path): return os.path.getsize(path)/1e6
@@ -333,45 +335,44 @@ def main(cfg_path: str, backend_name: str):
     else:
         idx_mb = dir_size_mb(os.path.join(processed_dir, "chroma"))
 
-    
-    summary = {
-        "backend": backend_label,
-        "k": k,
-        "queries_evaluated": len(rows),
-        "latency_ms": {
-            "mean": (sum(retr_latencies)/len(retr_latencies)) if retr_latencies else 0.0,
-            "p50": pctl(retr_latencies, 50),
-            "p90": pctl(retr_latencies, 90),
-            "p95": pctl(retr_latencies, 95),
-            "p99": pctl(retr_latencies, 99),
-            "qps": (len(rows) / (sum(retr_latencies)/1000.0)) if retr_latencies else 0.0
-        },
-        "quality": {
-            "recall_at_k_mean": (sum_recall/len(rows)) if rows else 0.0,
-            "mrr_at_k_mean": (sum(mrr_vals)/len(mrr_vals)) if mrr_vals else 0.0,
-            "precision_at_k_mean": (sum(prec_vals)/len(prec_vals)) if prec_vals else 0.0
-        },
-        "resources": {
-            "index_mb": idx_mb,
-            "peak_rss_mb": peak_rss_mb,
-            "cpu_pct_avg": (sum(cpu_samples)/len(cpu_samples)) if cpu_samples else 0.0
-        },
-        "llm": {
-            "used": bool(enable_gen),
-            "gen_ms_mean": (sum(gen_latencies)/len(gen_latencies)) if gen_latencies else 0.0,
-            "context_tokens_mean": (sum(ctx_tokens)/len(ctx_tokens)) if ctx_tokens else 0.0,
-            "gold_in_context_rate": (gold_in_ctx/len(rows)) if rows else 0.0
-        },
-        "notes": {
-            "n_query_expansions": cfg.get("retrieval",{}).get("n_query_expansions"),
-            "normalize": cfg.get("embedding",{}).get("normalize"),
-        }
-    }
+    # Persist results
+    jsonl_path = os.path.join(results_dir, f"rag_batch_{backend_label}.jsonl")
+    with open(jsonl_path, "w", encoding="utf-8") as f:
+        for r in rows:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    summary_path = os.path.join(results_dir, f"rag_summary_{backend_label}.json")
+    csv_path = os.path.join(results_dir, f"rag_batch_{backend_label}.csv")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["backend","qid","gold_id","recall_at_k","retrieval_ms","generation_ms","hit_ids"])
+        for r in rows:
+            w.writerow([r["backend"], r["qid"], r["gold_id"], r["recall_at_k"], f"{r['retrieval_ms']:.2f}", f"{r['generation_ms']:.2f}", "|".join(r["hit_ids"])])
+
+    # Console summary
+    N = len(rows)
+    avg_retr   = sum_retr_ms / max(1, N)
+    avg_gen    = sum_gen_ms  / max(1, N)
+    avg_recall = sum_recall  / max(1, N)
+    avg_ctoken = sum_tokens  / max(1,N)
+    print("\n===== RAG BENCH SUMMARY =====")
+    print(f"Backend: {backend_label}")
+    print(f"Queries: {N} | recall@{k}: {avg_recall:.3f}")
+    print(f"Avg retrieval latency:  {avg_retr:.1f} ms")
+    print(f"Avg generation latency: {avg_gen:.1f} ms (0 if disabled)")
+    print(f"Avg generation token: {avg_ctoken:.1f} ms (0 if disabled)")
+    print(f"Index mb: {idx_mb:.1f}")
+
+    # Write summary JSON
+    summary_path = os.path.join(results_dir, f"rag_batch_{backend_label}_summary.json")
     with open(summary_path, "w", encoding="utf-8") as f:
-        json.dump(summary, f, indent=2)
-    print(f"[summary] wrote {summary_path}")
+        json.dump({
+            "backend": backend_label,
+            "query_count": N,
+            "k": k,
+            "avg_recall_at_k": avg_recall,
+            "avg_retrieval_ms": avg_retr,
+            "avg_generation_ms": avg_gen,
+        }, f, indent=2)
 
 
 if __name__ == "__main__":
