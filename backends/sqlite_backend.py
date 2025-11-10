@@ -90,15 +90,14 @@ class SQLiteBackend(StorageBackend):
 
         self.conn.commit()
 
-    def add_documents(
-        self,
-        ids: List[str],
-        vectors,
-        metadatas: List[Dict[str, Any]],
-        texts: List[str],
-    ) -> None:
-        """Alias to index_documents for symmetry with other backends."""
+    def add_documents(self, ids, vectors, metadatas, texts=None) -> None:
+        """
+        Insert/append docs. `texts` may be None (will store empty strings).
+        """
+        if texts is None:
+            texts = [""] * len(ids)
         self.index_documents(ids, vectors, metadatas, texts)
+
 
     # ---------------- Querying ----------------
 
@@ -163,4 +162,5 @@ class SQLiteBackend(StorageBackend):
                 self.conn.commit()
             finally:
                 self.conn.close()
+
                 self.conn = None
